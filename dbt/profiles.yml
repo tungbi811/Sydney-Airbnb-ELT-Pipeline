@@ -1,0 +1,12 @@
+airbnb_analytics:
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST') }}"
+      port: 5432
+      dbname: "{{ env_var('POSTGRES_DATABASE') }}"
+      user: "{{ env_var('POSTGRES_USER') }}"
+      pass: "{{ env_var('POSTGRES_PASSWORD') }}"
+      schema: dbt_schema
+      threads: 4
+  target: dev

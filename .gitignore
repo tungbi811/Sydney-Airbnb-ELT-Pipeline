@@ -14,8 +14,7 @@ wheels/
 .env.*
 !.env.example
 
-# Local dbt configuration
-/dbt/profiles.yml
+# Local dbt user settings
 /dbt/.user.yml
 
 # Local editor settings
@@ -26,3 +25,4 @@ wheels/
 
 # macOS metadata
 .DS_Store
+.playwright-mcp/

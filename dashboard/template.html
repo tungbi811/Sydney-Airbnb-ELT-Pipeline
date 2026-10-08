@@ -1,0 +1,440 @@
+<title>Sydney Airbnb Market Insights</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a coral tile mosaic. KPI strip on top; title + LGA map in the centre column, trends left, LGA comparisons right.
+   Single deliberate look (coral ground, white ink), so colours are set explicitly rather than per theme. */
+:root {
+  color-scheme: light;
+  --ground: #ff385c;        /* page ground and tile seams (Airbnb Rausch) */
+  --tile: #e61e4d;          /* tile surface; white text on it = 4.5:1 */
+  --seam: #ff385c;          /* 1px lines between tiles */
+  --ink: #ffffff;           /* primary text and marks */
+  --ink-2: rgba(255, 255, 255, .80);  /* secondary text */
+  --ink-3: rgba(255, 255, 255, .62);  /* axis labels, notes */
+  --grid: rgba(255, 255, 255, .16);   /* gridlines */
+  --soft: rgba(255, 255, 255, .45);   /* "other LGA" marks */
+  --plum: #222222;          /* bottom-3 LGAs (brand charcoal); 3.5:1 on the tile, max contrast against white top-3 marks */
+  --tip: #222222;
+  --ramp-1: #ffe3e9; --ramp-2: #ffb0bf; --ramp-3: #ff7a93; --ramp-4: #a3123a; --ramp-5: #4a0a1c;  /* map, light to dark */
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 400 13px/1.45 var(--font-body);
+       padding-inline: 20px; padding-block: 20px; }
+.board { max-width: 1440px; margin-inline: auto; display: grid; gap: 1px; background: var(--seam);
+         border: 1px solid var(--seam); border-radius: 14px; overflow: hidden; }
+
+/* KPI strip */
+.kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; }
+.kpi { background: var(--tile); padding: 13px 16px 12px; display: grid; gap: 3px; align-content: start; min-width: 0; }
+.kpi .label { font: 600 10.5px/1.3 var(--font-body); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-2); }
+.kpi .value { font: 700 27px/1.1 var(--font-display); letter-spacing: -.01em; }
+.kpi .sub { font-size: 11.5px; color: var(--ink-3); }
+.kpi .sub b { color: var(--ink); font-weight: 600; }
+
+/* Main mosaic */
+.mosaic { display: grid; gap: 1px; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr);
+          grid-template-areas: "rev centre scatter" "active centre extremes"; }
+.tile { background: var(--tile); padding: 14px 16px 12px; min-width: 0; display: flex; flex-direction: column; }
+.tile h2 { font: 600 14px/1.25 var(--font-display); margin: 0; text-wrap: balance; }
+.tile .note { margin: 2px 0 8px; font-size: 11.5px; color: var(--ink-3); }
+.a-rev { grid-area: rev; } .a-active { grid-area: active; } .a-scatter { grid-area: scatter; } .a-ext { grid-area: extremes; }
+.a-centre { grid-area: centre; padding: 20px 20px 14px; }
+.chart { width: 100%; display: block; flex: 1; min-height: 0; }
+#rev, #active, #scatter { height: 228px; flex: none; }
+svg text { font-family: var(--font-body); }
+
+/* Centre: title + map */
+.eyebrow { margin: 0; font: 600 11px/1.3 var(--font-body); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); text-align: center; }
+h1 { margin: 6px 0 2px; font: 800 clamp(26px, 2.6vw, 36px)/1.02 var(--font-display); letter-spacing: -.02em; text-align: center; text-wrap: balance; }
+.lede { margin: 0 auto; max-width: 48ch; text-align: center; color: var(--ink-2); font-size: 12.5px; }
+#map { flex: 1; min-height: 420px; margin-top: 6px; }
+.ramp { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 11px; color: var(--ink-2); flex-wrap: wrap; }
+.ramp .steps { display: flex; gap: 2px; }
+.ramp .steps span { display: grid; gap: 3px; justify-items: center; font-size: 10px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.ramp .steps i { display: block; width: 46px; height: 9px; border-radius: 2px; }
+
+/* Month player */
+.player { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.period { font: 700 15px/1 var(--font-display); min-width: 9.5em; text-align: center; letter-spacing: .01em; }
+.play { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,.6); background: transparent; color: var(--ink);
+        font: 600 12px/1 var(--font-body); padding: 6px 11px; border-radius: 999px; cursor: pointer; }
+.play:hover { background: rgba(255,255,255,.12); }
+.play:focus-visible, .chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.chips { display: flex; gap: 2px; }
+.chip { border: 0; background: rgba(255,255,255,.14); color: var(--ink-2); font: 600 11px/1 var(--font-body); padding: 6px 0; width: 24px;
+        border-radius: 4px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.chip.all { width: auto; padding-inline: 8px; margin-right: 4px; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--tile); }
+.chip:hover:not([aria-pressed="true"]) { background: rgba(255,255,255,.26); }
+
+/* LGA extremes list */
+.ext { display: grid; gap: 4px; margin-top: 2px; }
+.erow { display: grid; grid-template-columns: minmax(0, 9em) minmax(0, 1fr) 3.6em 4.6em; gap: 8px; align-items: center;
+        font-size: 12px; font-variant-numeric: tabular-nums; border-radius: 4px; padding: 1px 4px; }
+.erow.hdr { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+.erow.hl, .erow:not(.hdr):hover { background: rgba(255, 255, 255, .1); }
+.erow .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.erow .num { text-align: right; } .erow .cov { text-align: right; color: var(--ink-3); }
+.erow .bar { height: 10px; border-radius: 0 4px 4px 0; background: var(--soft); }
+.erow.top .bar { background: var(--ink); } .erow.bot .bar { background: var(--plum); }
+.gapline { font-size: 11px; color: var(--ink-3); padding-left: 4px; }
+.keyline { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--ink-2); margin-top: auto; padding-top: 8px; }
+.keyline span { display: inline-flex; align-items: center; gap: 5px; }
+.keyline i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+.foot { background: var(--tile); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 24px;
+        padding: 9px 16px; font-size: 11px; color: var(--ink-3); }
+.foot b { color: var(--ink-2); font-weight: 600; }
+
+#tip { position: fixed; pointer-events: none; z-index: 10; background: var(--tip); color: #fff; font-size: 12px; line-height: 1.4;
+       padding: 6px 9px; border-radius: 6px; max-width: 250px; opacity: 0; transition: opacity .1s; }
+@media (prefers-reduced-motion: reduce) { #tip { transition: none; } }
+
+@media (min-width: 1101px) and (min-height: 760px) {
+  html, body { height: 100%; }
+  .board { min-height: 100%; grid-template-rows: auto 1fr auto; }
+  .mosaic { grid-template-rows: 1fr 1fr; }
+  #rev, #active, #scatter { flex: 1 1 0; height: auto; min-height: 190px; }
+  #map { flex: 1 1 0; height: auto; min-height: 400px; }
+  .ext { flex: 1; align-content: space-evenly; }
+}
+@media (max-width: 1100px) {
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mosaic { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            grid-template-areas: "centre centre" "rev scatter" "active extremes"; }
+}
+@media (max-width: 680px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mosaic { grid-template-columns: minmax(0, 1fr); grid-template-areas: "centre" "rev" "active" "scatter" "extremes"; }
+  #map { height: 380px; }
+}
+</style>
+
+<div class="board">
+  <section class="kpis" aria-label="Headline figures">
+    <div class="kpi"><span class="label" id="k-active-label">Active listings</span><span class="value" id="k-active"></span><span class="sub" id="k-active-sub"></span></div>
+    <div class="kpi"><span class="label" id="k-revenue-label">Estimated revenue</span><span class="value" id="k-revenue"></span><span class="sub" id="k-revenue-sub"></span></div>
+    <div class="kpi"><span class="label" id="k-price-label">Median nightly price</span><span class="value" id="k-price"></span><span class="sub" id="k-price-sub"></span></div>
+    <div class="kpi"><span class="label" id="k-gap-label">Revenue gap per listing</span><span class="value" id="k-gap"></span><span class="sub" id="k-gap-sub"></span></div>
+    <div class="kpi"><span class="label">Multi-listing hosts in one LGA · 12 mo</span><span class="value" id="k-local"></span><span class="sub" id="k-local-sub"></span></div>
+    <div class="kpi"><span class="label">Hosts covering the mortgage · 12 mo</span><span class="value" id="k-cover"></span><span class="sub" id="k-cover-sub"></span></div>
+  </section>
+
+  <section class="mosaic">
+    <article class="tile a-rev" aria-labelledby="t-rev">
+      <h2 id="t-rev">Revenue per active listing, by month</h2>
+      <p class="note" id="rev-note"></p>
+      <svg class="chart" id="rev" role="img" aria-label="Line chart of monthly revenue per active listing"></svg>
+    </article>
+
+    <article class="tile a-centre" aria-labelledby="t-title">
+      <p class="eyebrow">Inside Airbnb · ABS Census 2016 · May 2020 – Apr 2021</p>
+      <h1 id="t-title">Sydney Airbnb Market Insights</h1>
+      <p class="lede">Where Airbnb hosts earn most across Sydney's 29 local government areas, and who lives there.</p>
+      <div class="player" aria-label="Choose a period">
+        <button class="play" id="play" type="button" aria-label="Play months">▶ Play</button>
+        <span class="period" id="period" aria-live="polite"></span>
+        <div class="chips" id="chips"></div>
+      </div>
+      <svg class="chart" id="map" role="img" aria-label="Map of Sydney LGAs shaded by 12-month revenue per active listing"></svg>
+      <div class="ramp" aria-label="Map key">
+        <span id="ramp-label"></span>
+        <span class="steps" id="ramp"></span>
+      </div>
+    </article>
+
+    <article class="tile a-scatter" aria-labelledby="t-scatter">
+      <h2 id="t-scatter">Older LGAs earn more per listing <span id="sc-period" style="font-weight:500;color:var(--ink-2)"></span></h2>
+      <p class="note" id="scatter-note"></p>
+      <svg class="chart" id="scatter" role="img" aria-label="Scatter plot of residents' median age against revenue per active listing"></svg>
+    </article>
+
+    <article class="tile a-active" aria-labelledby="t-active">
+      <h2 id="t-active">Active listings, by month</h2>
+      <p class="note" id="active-note"></p>
+      <svg class="chart" id="active" role="img" aria-label="Bar chart of active listings per month"></svg>
+    </article>
+
+    <article class="tile a-ext" aria-labelledby="t-ext">
+      <h2 id="t-ext">Highest and lowest earning LGAs <span id="ext-period" style="font-weight:500;color:var(--ink-2)"></span></h2>
+      <p class="note" id="ext-note"></p>
+      <div class="ext" id="ext" role="table" aria-label="Top 5 and bottom 3 LGAs by revenue per active listing"></div>
+      <div class="keyline">
+        <span><i style="background:var(--ink)"></i>Top 3</span>
+        <span><i style="background:var(--plum)"></i>Bottom 3</span>
+        <span><i style="background:var(--soft)"></i>Other LGAs</span>
+      </div>
+    </article>
+  </section>
+
+  <footer class="foot">
+    <span><b>Method</b> · Stays = 30 − available nights per monthly scrape, active listings only · Revenue = stays × nightly price · AUD</span>
+    <span><b>Pipeline</b> · S3 → Postgres (Bronze · Silver · Gold) → dbt with SCD2 snapshots → Airflow + Cosmos</span>
+  </footer>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script type="application/json" id="data">__DATA__</script>
+<script>
+(() => {
+  const D = JSON.parse(document.getElementById("data").textContent);
+  const $ = id => document.getElementById(id);
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag);
+    for (const [a, v] of Object.entries(attrs)) e.setAttribute(a, v); if (parent) parent.appendChild(e); return e; };
+  const txt = (p, x, y, s, a = {}) => { const t = el("text", { x, y, fill: css("--ink-3"), "font-size": 10.5, ...a }, p); t.textContent = s; return t; };
+  const k = v => "$" + (v / 1000).toFixed(1) + "K";
+  const int = v => Math.round(v).toLocaleString("en-AU");
+  const pct = (a, b) => Math.round(100 * (a / b - 1));
+  const delta = (a, b, unit = "%") => { const d = unit === "%" ? pct(a, b) : Math.round(a - b);
+    return `<b>${d > 0 ? "▲" : d < 0 ? "▼" : "■"} ${unit === "$" ? "$" + Math.abs(d) : Math.abs(d) + "%"}</b>`; };
+  const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const FULL = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const monthName = m => MON[+m.slice(5) - 1] + " " + m.slice(0, 4);
+  const monthFull = m => FULL[+m.slice(5) - 1] + " " + m.slice(0, 4);
+
+  const M = D.monthly, first = M[0], last = M[M.length - 1];
+  const topSet = new Set(D.groups.filter(g => g.g === "top 3").map(g => g.lga));
+  const botSet = new Set(D.groups.filter(g => g.g === "bottom 3").map(g => g.lga));
+  const grp = lga => topSet.has(lga) ? "top" : botSet.has(lga) ? "bot" : "other";
+  const markFill = g => g === "top" ? css("--ink") : g === "bot" ? css("--plum") : css("--soft");
+  const byCode = Object.fromEntries(D.lgas.map(l => [l.code, l]));
+  const LM = {};  // LGA code -> month -> {active, rpa}
+  D.lga_monthly.forEach(r => { (LM[r.code] ??= {})[r.m] = r; });
+
+  /* Period state: null = the full 12 months, otherwise an index into M */
+  let P = null;
+  const val = l => P === null ? l.rev : LM[l.code][M[P].m].rpa;
+  const periodLabel = () => P === null ? "12 months" : monthName(M[P].m);
+  const pearson = (xs, ys) => { const n = xs.length, mx = xs.reduce((a, b) => a + b) / n, my = ys.reduce((a, b) => a + b) / n;
+    let sxy = 0, sxx = 0, syy = 0; xs.forEach((x, i) => { sxy += (x - mx) * (ys[i] - my); sxx += (x - mx) ** 2; syy += (ys[i] - my) ** 2; });
+    return { r: sxy / Math.sqrt(sxx * syy), slope: sxy / sxx, mx, my }; };
+
+  /* Tooltip */
+  const tip = $("tip");
+  const move = e => { const r = tip.getBoundingClientRect(); let x = e.clientX + 14, y = e.clientY + 14;
+    if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14; if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 14;
+    tip.style.left = x + "px"; tip.style.top = y + "px"; };
+  const hover = (node, html, lga) => {
+    node.addEventListener("mouseenter", e => { tip.innerHTML = typeof html === "function" ? html() : html; tip.style.opacity = 1; move(e); if (lga) highlight(lga, true); });
+    node.addEventListener("mousemove", move);
+    node.addEventListener("mouseleave", () => { tip.style.opacity = 0; if (lga) highlight(lga, false); });
+  };
+  const lgaTip = l => () => `<b>${l.lga}</b> · ${periodLabel()}<br>${k(val(l))} per active listing · median age ${l.age}` +
+    (P === null ? "" : `<br>${int(LM[l.code][M[P].m].active)} active listings`) +
+    `<br>${l.cover}% of single-listing hosts cover the mortgage (12 mo)`;
+  const highlight = (lga, on) => document.querySelectorAll(`[data-lga="${CSS.escape(lga)}"]`).forEach(n => {
+    if (n.classList.contains("erow")) n.classList.toggle("hl", on);
+    else if (n.tagName === "circle") n.setAttribute("r", on ? 8 : 5);
+    else if (n.tagName === "path") { n.setAttribute("stroke-width", on ? 2.5 : .8); if (on) n.parentNode.appendChild(n); }
+  });
+
+  /* KPIs */
+  const T = D.age.find(a => a.g === "top 3"), B = D.age.find(a => a.g === "bottom 3");
+  const groupAvg = set => { const ls = D.lgas.filter(l => set.has(l.lga)); return ls.reduce((s, l) => s + val(l), 0) / ls.length; };
+  const multi = D.spread.reduce((s, x) => s + x.n, 0), one = D.spread.find(x => x.k === "1").n;
+  $("k-local").textContent = (100 * one / multi).toFixed(1) + "%";
+  $("k-local-sub").textContent = `of ${int(multi)} hosts · 5+ LGAs: ${D.spread.find(x => x.k === "5+").avg_listings} listings each`;
+  const bestCov = [...D.lgas].sort((a, b) => b.cover - a.cover)[0];
+  $("k-cover").textContent = D.cover_total.p.toFixed(1) + "%";
+  $("k-cover-sub").textContent = `of single-listing hosts · ${bestCov.lga} ${bestCov.cover}%`;
+  function drawKpis() {
+    if (P === null) {
+      $("k-active-label").textContent = "Active listings · Apr 2021";
+      $("k-active").textContent = (last.active / 1000).toFixed(1) + "K";
+      $("k-active-sub").innerHTML = `${delta(last.active, first.active)} since May 2020`;
+      $("k-revenue-label").textContent = "Estimated revenue · 12 months";
+      $("k-revenue").textContent = "$" + (M.reduce((s, m) => s + m.revenue_m, 0) / 1000).toFixed(2) + "B";
+      $("k-revenue-sub").textContent = "All active listings across 29 LGAs";
+      $("k-price-label").textContent = "Median nightly price · Apr 2021";
+      $("k-price").textContent = "$" + Math.round(last.median_price);
+      $("k-price-sub").innerHTML = `${delta(last.median_price, first.median_price, "$")} since May 2020`;
+      $("k-gap").textContent = (T.rev / B.rev).toFixed(1) + "×";
+    } else {
+      const c = M[P], prev = M[P - 1], when = monthName(c.m);
+      $("k-active-label").textContent = "Active listings · " + when;
+      $("k-active").textContent = (c.active / 1000).toFixed(1) + "K";
+      $("k-active-sub").innerHTML = prev ? `${delta(c.active, prev.active)} vs ${monthName(prev.m)}` : "First monthly scrape";
+      $("k-revenue-label").textContent = "Estimated revenue · " + when;
+      $("k-revenue").textContent = "$" + c.revenue_m.toFixed(1) + "M";
+      $("k-revenue-sub").innerHTML = prev ? `${delta(c.revenue_m, prev.revenue_m)} vs ${monthName(prev.m)}` : "All active listings across 29 LGAs";
+      $("k-price-label").textContent = "Median nightly price · " + when;
+      $("k-price").textContent = "$" + Math.round(c.median_price);
+      $("k-price-sub").innerHTML = prev ? `${delta(c.median_price, prev.median_price, "$")} vs ${monthName(prev.m)}` : "Active listings only";
+      $("k-gap").textContent = (groupAvg(topSet) / groupAvg(botSet)).toFixed(1) + "×";
+    }
+    $("k-gap-label").textContent = "Revenue gap per listing · " + (P === null ? "12 mo" : monthName(M[P].m));
+    $("k-gap-sub").textContent = "Top 3 vs bottom 3 LGAs";
+  }
+
+  /* Shared month axis + current-month band */
+  const monthAxis = (g, X, y) => M.forEach((m, i) => {
+    txt(g, X(i), y, MON[+m.m.slice(5) - 1][0], { "text-anchor": "middle", fill: i === P ? css("--ink") : css("--ink-3"), "font-weight": i === P ? 700 : 400 });
+    if (i === 0 || m.m.endsWith("-01")) txt(g, X(i), y + 13, m.m.slice(0, 4), { "text-anchor": "middle", fill: css("--ink-2"), "font-weight": 600 });
+  });
+  const band = (g, x, w, top, h) => { if (P !== null) el("rect", { x: x - w / 2, y: top, width: w, height: h, rx: 4, fill: "rgba(255,255,255,.12)" }, g); };
+
+  function drawRev() {
+    const svg = $("rev"); svg.innerHTML = ""; const W = svg.clientWidth, H = svg.clientHeight; svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    const m = { l: 36, r: 40, t: 18, b: 32 }, pw = W - m.l - m.r, ph = H - m.t - m.b, y0 = 3000, y1 = 6000;
+    const X = i => m.l + i / (M.length - 1) * pw, Y = v => m.t + ph - (v - y0) / (y1 - y0) * ph, g = el("g", {}, svg);
+    band(g, X(P ?? 0), pw / 11, m.t, ph);
+    for (let v = 3000; v <= 6000; v += 1000) { el("line", { x1: m.l, x2: m.l + pw, y1: Y(v), y2: Y(v), stroke: css("--grid") }, g);
+      txt(g, m.l - 6, Y(v) + 4, "$" + v / 1000 + "K", { "text-anchor": "end" }); }
+    const pts = M.map((d, i) => [X(i), Y(d.rev_per_active)]);
+    el("path", { d: `M${pts[0][0]},${Y(y0)}L${pts.map(p => p.join(",")).join("L")}L${pts.at(-1)[0]},${Y(y0)}Z`, fill: "rgba(255,255,255,.16)" }, g);
+    el("path", { d: "M" + pts.map(p => p.join(",")).join("L"), fill: "none", stroke: css("--ink"), "stroke-width": 2, "stroke-linejoin": "round" }, g);
+    const peak = M.reduce((a, b) => b.rev_per_active > a.rev_per_active ? b : a), pi = M.indexOf(peak);
+    M.forEach((d, i) => {
+      el("circle", { cx: pts[i][0], cy: pts[i][1], r: i === P ? 6 : i === M.length - 1 || i === pi ? 4.5 : 3, fill: css("--ink"), stroke: css("--tile"), "stroke-width": 2 }, g);
+      const hit = el("rect", { x: pts[i][0] - pw / 24, y: m.t, width: pw / 12, height: ph, fill: "transparent", style: "cursor:pointer" }, g);
+      hit.addEventListener("click", () => setPeriod(i));
+      hover(hit, `<b>${monthName(d.m)}</b><br>${k(d.rev_per_active)} per active listing<br>${int(d.active)} active listings`);
+    });
+    if (P === null) {
+      txt(g, pts[pi][0], pts[pi][1] - 9, "Peak " + k(peak.rev_per_active), { "text-anchor": "middle", fill: css("--ink"), "font-weight": 600, "font-size": 11 });
+      txt(g, pts.at(-1)[0] + 7, pts.at(-1)[1] + 4, k(last.rev_per_active), { fill: css("--ink"), "font-weight": 600, "font-size": 11 });
+    } else {
+      txt(g, pts[P][0], m.t + 12, k(M[P].rev_per_active), { "text-anchor": "middle", fill: css("--ink"), "font-weight": 700, "font-size": 12 });
+    }
+    monthAxis(g, X, m.t + ph + 14);
+    $("rev-note").textContent = `Peaked in ${monthName(peak.m)}; ${pct(last.rev_per_active, first.rev_per_active)}% higher in Apr 2021 than May 2020`;
+  }
+
+  function drawActive() {
+    const svg = $("active"); svg.innerHTML = ""; const W = svg.clientWidth, H = svg.clientHeight; svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    const m = { l: 36, r: 6, t: 18, b: 32 }, pw = W - m.l - m.r, ph = H - m.t - m.b, y1 = 40000;
+    const slot = pw / M.length, bw = Math.min(22, slot - 6), X = i => m.l + slot * i + slot / 2, Y = v => m.t + ph - v / y1 * ph, g = el("g", {}, svg);
+    for (let v = 0; v <= y1; v += 10000) { el("line", { x1: m.l, x2: m.l + pw, y1: Y(v), y2: Y(v), stroke: css("--grid") }, g);
+      txt(g, m.l - 6, Y(v) + 4, v ? v / 1000 + "K" : "0", { "text-anchor": "end" }); }
+    const emph = i => P === null ? (i === 0 || i === M.length - 1) : i === P;
+    M.forEach((d, i) => {
+      const x = X(i) - bw / 2, y = Y(d.active), h = Y(0) - y, r = 4;
+      const b = el("path", { d: `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + bw - r}Q${x + bw},${y} ${x + bw},${y + r}V${y + h}Z`,
+        fill: emph(i) ? css("--ink") : css("--soft"), style: "cursor:pointer" }, g);
+      b.addEventListener("click", () => setPeriod(i));
+      hover(b, `<b>${monthName(d.m)}</b><br>${int(d.active)} active listings<br>Median price $${Math.round(d.median_price)} a night`);
+      if (emph(i)) txt(g, X(i), y - 5, (d.active / 1000).toFixed(1) + "K", { "text-anchor": "middle", fill: css("--ink"), "font-weight": 600 });
+    });
+    monthAxis(g, X, m.t + ph + 14);
+    const low = M.reduce((a, b) => b.active < a.active ? b : a);
+    $("active-note").textContent = `Down ${-pct(last.active, first.active)}% over the year; lowest in ${monthName(low.m)} (${int(low.active)})`;
+  }
+
+  const niceMax = v => { const steps = [2000, 2500, 5000, 10000, 20000, 25000]; for (const s of steps) if (v / s <= 5) return [Math.ceil(v * 1.06 / s) * s, s]; return [Math.ceil(v / 20000) * 20000, 20000]; };
+  function drawScatter() {
+    const svg = $("scatter"); svg.innerHTML = ""; const W = svg.clientWidth, H = svg.clientHeight; svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    const L = D.lgas, [y1, step] = niceMax(Math.max(...L.map(val)));
+    const m = { l: 40, r: 10, t: 8, b: 30 }, pw = W - m.l - m.r, ph = H - m.t - m.b, x0 = 31, x1 = 44;
+    const X = v => m.l + (v - x0) / (x1 - x0) * pw, Y = v => m.t + ph - v / y1 * ph, g = el("g", {}, svg);
+    for (let v = 0; v <= y1; v += step) { el("line", { x1: m.l, x2: m.l + pw, y1: Y(v), y2: Y(v), stroke: css("--grid") }, g);
+      txt(g, m.l - 6, Y(v) + 4, v ? (v >= 10000 ? "$" + v / 1000 + "K" : k(v).replace(".0K", "K")) : "$0", { "text-anchor": "end" }); }
+    for (let v = 32; v <= 44; v += 2) txt(g, X(v), m.t + ph + 15, v, { "text-anchor": "middle" });
+    txt(g, m.l + pw, m.t + ph + 27, "Residents' median age", { "text-anchor": "end" });
+    const fit = pearson(L.map(l => l.age), L.map(val)), f = v => fit.my + fit.slope * (v - fit.mx);
+    el("line", { x1: X(32), y1: Y(f(32)), x2: X(43.5), y2: Y(f(43.5)), stroke: "rgba(255,255,255,.55)", "stroke-width": 2, "stroke-linecap": "round" }, g);
+    [...L].sort((a, b) => (grp(a.lga) !== "other") - (grp(b.lga) !== "other")).forEach(l => {
+      const c = el("circle", { cx: X(l.age), cy: Y(val(l)), r: 5, fill: markFill(grp(l.lga)), stroke: css("--tile"), "stroke-width": 2, "data-lga": l.lga }, g);
+      hover(c, lgaTip(l), l.lga);
+    });
+    const place = { "Mosman": [-9, 4, "end"], "Northern Beaches": [-9, 4, "end"], "Woollahra": [-9, 4, "end"],
+                    "Burwood": [9, -2, "start"], "Blacktown": [-9, 12, "end"], "Fairfield": [9, 11, "start"] };
+    // labels on the same side never stack closer than one line apart
+    const lab = L.filter(l => place[l.lga]).map(l => ({ l, p: place[l.lga], x: X(l.age) + place[l.lga][0], y: Y(val(l)) + place[l.lga][1] }))
+      .sort((a, b) => a.y - b.y);
+    lab.forEach((a, i) => lab.slice(0, i).forEach(b => { if (b.p[2] === a.p[2] && a.y - b.y < 13) a.y = b.y + 13; }));
+    lab.forEach(a => txt(g, a.x, a.y, a.l.lga, { "text-anchor": a.p[2], fill: css("--ink"), "font-size": 11, "font-weight": 600 }));
+    $("sc-period").textContent = "· " + periodLabel();
+    $("scatter-note").textContent = `Each dot is an LGA · r = ${fit.r.toFixed(2)} · +${k(fit.slope)} per extra year of median age`;
+  }
+
+  /* Map */
+  const SCALES = { all: { breaks: [15000, 25000, 40000, 60000], labels: ["<$15K", "$15–25K", "$25–40K", "$40–60K", "$60K+"] },
+                   month: { breaks: [2000, 3000, 4500, 6500], labels: ["<$2K", "$2–3K", "$3–4.5K", "$4.5–6.5K", "$6.5K+"] } };
+  const scale = () => SCALES[P === null ? "all" : "month"];
+  const rampColor = v => css("--ramp-" + (1 + scale().breaks.filter(b => v >= b).length));
+  function drawMap() {
+    $("ramp-label").textContent = "Revenue per active listing · " + periodLabel();
+    $("ramp").innerHTML = scale().labels.map((s, i) => `<span><i style="background:var(--ramp-${i + 1})"></i>${s}</span>`).join("");
+    const svg = $("map"); svg.innerHTML = ""; const W = svg.clientWidth, H = svg.clientHeight; svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    const polys = f => f.geometry.type === "MultiPolygon" ? f.geometry.coordinates : [f.geometry.coordinates];
+    let minX = 180, maxX = -180, minY = 90, maxY = -90;
+    D.geo.features.forEach(f => polys(f).forEach(p => p[0].forEach(([x, y]) => { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); })));
+    const cos = Math.cos((minY + maxY) / 2 * Math.PI / 180), padX = 122, padY = 8;
+    const s = Math.min((W - 2 * padX) / ((maxX - minX) * cos), (H - 2 * padY) / (maxY - minY));
+    const ox = (W - (maxX - minX) * cos * s) / 2, oy = (H - (maxY - minY) * s) / 2;
+    const Pj = ([x, y]) => [ox + (x - minX) * cos * s, oy + (maxY - y) * s];
+    const g = el("g", {}, svg), labels = [];
+    D.geo.features.forEach(f => {
+      const l = byCode[f.properties.lga_code]; if (!l) return;
+      const d = polys(f).map(p => p.map(ring => "M" + ring.map(c => Pj(c).map(v => v.toFixed(1)).join(",")).join("L") + "Z").join("")).join("");
+      const path = el("path", { d, fill: rampColor(val(l)), stroke: css("--ink"), "stroke-width": .8, "stroke-linejoin": "round", "data-lga": l.lga }, g);
+      hover(path, lgaTip(l), l.lga);
+      if (grp(l.lga) !== "other") {
+        const ring = polys(f).reduce((a, b) => b[0].length > a[0].length ? b : a)[0];
+        const c = ring.reduce((a, p) => [a[0] + p[0] / ring.length, a[1] + p[1] / ring.length], [0, 0]);
+        labels.push({ l, at: Pj(c), side: grp(l.lga) === "top" ? "right" : "left" });
+      }
+    });
+    ["right", "left"].forEach(side => {
+      const group = labels.filter(x => x.side === side).sort((a, b) => a.at[1] - b.at[1]);
+      let prev = -Infinity;
+      group.forEach(x => {
+        const y = Math.max(x.at[1], prev + 30); prev = y;
+        const lx = side === "right" ? W - padX + 12 : padX - 12;
+        el("polyline", { points: `${x.at[0]},${x.at[1]} ${lx + (side === "right" ? -6 : 6)},${y} ${lx},${y}`, fill: "none", stroke: css("--ink"), "stroke-width": 1 }, g);
+        el("circle", { cx: x.at[0], cy: x.at[1], r: 2.5, fill: css("--ink") }, g);
+        const anchor = side === "right" ? "start" : "end", tx = lx + (side === "right" ? 4 : -4);
+        txt(g, tx, y - 1, x.l.lga, { "text-anchor": anchor, fill: css("--ink"), "font-size": 11, "font-weight": 600 });
+        txt(g, tx, y + 12, k(val(x.l)), { "text-anchor": anchor, fill: css("--ink-2"), "font-size": 11 });
+      });
+    });
+  }
+
+  /* Highest and lowest earning LGAs for the period */
+  function drawExtremes() {
+    const ranked = [...D.lgas].sort((a, b) => val(b) - val(a)), maxV = val(ranked[0]);
+    const row = l => `<div class="erow ${grp(l.lga)}" role="row" data-lga="${l.lga}"><span class="name" role="cell">${l.lga}</span>` +
+      `<span role="cell"><div class="bar" style="width:${(100 * val(l) / maxV).toFixed(1)}%"></div></span>` +
+      `<span class="num" role="cell">${k(val(l))}</span><span class="cov" role="cell">${l.cover.toFixed(1)}%</span></div>`;
+    $("ext").innerHTML = `<div class="erow hdr" role="row"><span role="columnheader">LGA</span><span role="columnheader">Revenue per listing</span><span></span><span role="columnheader" style="text-align:right">Mortgage</span></div>` +
+      ranked.slice(0, 5).map(row).join("") + `<div class="gapline">… ${ranked.length - 8} more LGAs …</div>` + ranked.slice(-3).map(row).join("");
+    $("ext").querySelectorAll(".erow[data-lga]").forEach(r => { const l = D.lgas.find(x => x.lga === r.dataset.lga); hover(r, lgaTip(l), l.lga); });
+    $("ext-period").textContent = "· " + periodLabel();
+  }
+  const guests = D.best.map(b => b.guests);
+  $("ext-note").textContent = `Mortgage = share of single-listing hosts covering it (12 months). In all top 5, entire apartments for ${Math.min(...guests)}–${Math.max(...guests)} guests get the most stays.`;
+
+  /* Month player */
+  const chips = $("chips");
+  chips.innerHTML = `<button type="button" class="chip all" data-i="-1">12 mo</button>` +
+    M.map((m, i) => `<button type="button" class="chip" data-i="${i}" title="${monthFull(m.m)}" aria-label="${monthFull(m.m)}">${MON[+m.m.slice(5) - 1][0]}</button>`).join("");
+  chips.addEventListener("click", e => { const b = e.target.closest(".chip"); if (b) { stop(); setPeriod(+b.dataset.i < 0 ? null : +b.dataset.i); } });
+  let timer = null;
+  const stop = () => { clearInterval(timer); timer = null; $("play").textContent = "▶ Play"; $("play").setAttribute("aria-label", "Play months"); };
+  $("play").addEventListener("click", () => {
+    if (timer) return stop();
+    $("play").textContent = "❚❚ Pause"; $("play").setAttribute("aria-label", "Pause");
+    setPeriod(P === null || P === M.length - 1 ? 0 : P + 1);
+    timer = setInterval(() => { if (P === M.length - 1) { stop(); setPeriod(null); } else setPeriod(P + 1); }, 1600);
+  });
+
+  const drawAll = () => { drawKpis(); drawRev(); drawActive(); drawScatter(); drawMap(); drawExtremes(); };
+  function setPeriod(i) {
+    P = i;
+    $("period").textContent = P === null ? "May 2020 – Apr 2021" : monthFull(M[P].m);
+    chips.querySelectorAll(".chip").forEach(b => b.setAttribute("aria-pressed", String(+b.dataset.i === (P ?? -1))));
+    drawAll();
+  }
+  // a bare #m2021-01 style anchor opens a given month (used for the README GIF frames)
+  const fromHash = () => { const h = location.hash.slice(1), i = M.findIndex(m => "m" + m.m === h); setPeriod(i >= 0 ? i : null); };
+  addEventListener("hashchange", fromHash);
+  fromHash();
+  let t; new ResizeObserver(() => { clearTimeout(t); t = setTimeout(drawAll, 60); }).observe(document.querySelector(".mosaic"));
+})();
+</script>
