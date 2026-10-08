@@ -14,5 +14,12 @@ wheels/
 .env.*
 !.env.example
 
+# Local dbt configuration
+/dbt/profiles.yml
+/dbt/.user.yml
+
+# Local editor settings
+/.vscode/
+
 # macOS metadata
 .DS_Store
