@@ -12,3 +12,8 @@ dependencies = [
     "psycopg2>=2.9.13",
     "python-dotenv>=1.2.4",
 ]
+
+[dependency-groups]
+dev = [
+    "astronomer-cosmos>=1.15.1",
+]
