@@ -26,6 +26,9 @@ def load_reference_tables():
 
             print(f'Loading {file_name} -> {table_name}')
 
+            # Reference data is a full snapshot, so replace it on every run to keep reruns idempotent
+            cur.execute(f"TRUNCATE TABLE {table_name}")
+
             obj = s3.get_object(Bucket=S3_BUCKET, Key=file_name)
 
             with TextIOWrapper(obj["Body"], encoding='utf-8') as f:
@@ -47,7 +50,8 @@ def load_reference_tables():
                         f"COPY {table_name} FROM STDIN WITH (FORMAT CSV, HEADER TRUE)",
                         cleaned,
                     )
-                cur.copy_expert(f"COPY {table_name} FROM STDIN WITH (FORMAT CSV, HEADER TRUE)", f)
+                else:
+                    cur.copy_expert(f"COPY {table_name} FROM STDIN WITH (FORMAT CSV, HEADER TRUE)", f)
 
         conn.commit()
 
