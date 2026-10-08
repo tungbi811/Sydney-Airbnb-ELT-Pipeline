@@ -21,5 +21,8 @@ wheels/
 # Local editor settings
 /.vscode/
 
+# Generated Airflow logs
+/airflow/logs/
+
 # macOS metadata
 .DS_Store

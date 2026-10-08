@@ -91,7 +91,7 @@ def load_listing_file(cur, file_name):
             (file_name,)
         )
 
-def load_listings():
+def load_listings_table():
     conn = get_connection()
 
     try:
@@ -114,4 +114,4 @@ def load_listings():
         conn.close()
 
 if __name__ == '__main__':
-    load_listings()
+    load_listings_table()
