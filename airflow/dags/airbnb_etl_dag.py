@@ -4,12 +4,11 @@ from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig, ExecutionConfig
 
 @dag(
     dag_id="airbnb_etl",
-    schedule=None,
-    start_date=datetime(2024, 1, 1),
-    catchup=False,
-    max_active_runs=1,
-    default_args={"retries": 1, "retry_delay": timedelta(minutes=2)},
-    tags=['airbnb', 'bronze']
+    schedule="@monthly",
+    start_date=datetime(2020, 5, 1),
+    end_date=datetime(2021,4,1),
+    catchup=True,
+    max_active_runs=1
 )
 def airbnb_etl():
 
@@ -19,9 +18,9 @@ def airbnb_etl():
         load_reference_tables()
 
     @task
-    def load_listings():
+    def load_listings(logical_date=None):
         from ingestion.load_listings import load_listings_table
-        load_listings_table()
+        load_listings_table(logical_date.strftime("%m_%Y"))
 
     dbt_transform = DbtTaskGroup(
         group_id='dbt_transform',
@@ -36,6 +35,6 @@ def airbnb_etl():
         )
     )
 
-    load_reference() >> load_listings() >> dbt_transform
+    [load_reference(), load_listings()] >> dbt_transform
 
 airbnb_etl()

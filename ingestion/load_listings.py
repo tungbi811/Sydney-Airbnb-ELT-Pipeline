@@ -91,19 +91,13 @@ def load_listing_file(cur, file_name):
             (file_name,)
         )
 
-def load_listings_table():
+def load_listings_table(month):
+    file_name = f"{LISTINGS_FOLDER}{month}.csv"
     conn = get_connection()
 
     try:
-        listing_files = list_csv_files(S3_BUCKET, LISTINGS_FOLDER)
-
-        print(f'Found {len(listing_files)} listing files')
-
         cur = conn.cursor()
-
-        for file in listing_files:
-            load_listing_file(cur, file)
-
+        load_listing_file(cur, file_name)
         conn.commit()
 
     except Exception:
@@ -114,4 +108,4 @@ def load_listings_table():
         conn.close()
 
 if __name__ == '__main__':
-    load_listings_table()
+    load_listings_table("05_2020")
