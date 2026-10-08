@@ -6,6 +6,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "boto3>=1.43.108",
+    "dbt-core>=1.12.5",
+    "dbt-postgres>=1.11.0",
     "psycopg2>=2.9.13",
     "python-dotenv>=1.2.4",
 ]

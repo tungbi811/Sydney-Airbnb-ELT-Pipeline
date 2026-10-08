@@ -1,0 +1,64 @@
+version: 2
+
+# SCD2 dimensions: the natural key repeats across versions, so uniqueness is tested on the
+# surrogate key (one per version) instead.
+models:
+  - name: dim_host
+    columns:
+      - name: host_sk
+        tests: [not_null, unique]
+      - name: host_id
+        tests: [not_null]
+      - name: valid_from
+        tests: [not_null]
+
+  - name: dim_property
+    columns:
+      - name: property_sk
+        tests: [not_null, unique]
+      - name: listing_id
+        tests: [not_null]
+      - name: valid_from
+        tests: [not_null]
+
+  - name: dim_lga
+    columns:
+      - name: lga_sk
+        tests: [not_null, unique]
+      - name: lga_code
+        tests: [not_null]
+      - name: valid_from
+        tests: [not_null]
+
+  - name: dim_suburb
+    columns:
+      - name: suburb_sk
+        tests: [not_null, unique]
+      - name: suburb_name
+        tests: [not_null]
+      - name: valid_from
+        tests: [not_null]
+
+  - name: ref_census_g01
+    columns:
+      - name: lga_code
+        tests: [not_null, unique]
+
+  - name: ref_census_g02
+    columns:
+      - name: lga_code
+        tests: [not_null, unique]
+
+  - name: fact_listings
+    tests:
+      - unique:
+          column_name: "listing_id || '-' || listing_month"
+    columns:
+      - name: listing_id
+        tests: [not_null]
+      - name: host_id
+        tests: [not_null]
+      - name: lga_code
+        tests: [not_null]
+      - name: listing_month
+        tests: [not_null]

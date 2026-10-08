@@ -1,0 +1,10 @@
+sources:
+  - name: bronze
+    database: airbnb
+    schema: bronze
+    tables:
+      - name: listings
+      - name: census_g01
+      - name: census_g02
+      - name: lga_codes
+      - name: suburb_lga_mapping

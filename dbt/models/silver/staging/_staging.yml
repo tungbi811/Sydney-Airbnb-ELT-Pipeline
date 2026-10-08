@@ -1,0 +1,35 @@
+version: 2
+
+models:
+  - name: stg_listings
+    columns:
+      - name: listing_id
+        tests: [not_null]
+      - name: scraped_date
+        tests: [not_null]
+      - name: room_type
+        tests:
+          - accepted_values:
+              values: ['Entire home/apt', 'Private room', 'Shared room', 'Hotel room']
+
+  - name: stg_census_g01
+    columns:
+      - name: lga_code
+        tests: [not_null, unique]
+
+  - name: stg_census_g02
+    columns:
+      - name: lga_code
+        tests: [not_null, unique]
+
+  - name: stg_lga_codes
+    columns:
+      - name: lga_code
+        tests: [not_null, unique]
+      - name: lga_name
+        tests: [not_null, unique]
+
+  - name: stg_suburb_lga_mapping
+    columns:
+      - name: suburb_name
+        tests: [not_null, unique]
