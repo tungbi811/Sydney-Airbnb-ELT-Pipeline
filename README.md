@@ -45,7 +45,7 @@ Raw copies of the sources, every column stored as `TEXT` so a malformed value ne
 | Folder | Models | Purpose |
 |---|---|---|
 | `star/` | `dim_host`, `dim_property`, `dim_lga`, `dim_suburb`, `fact_listings`, `ref_census_g01`, `ref_census_g02` | Star schema. Dimensions carry `valid_from` / `valid_to` truncated to the month; the fact holds one row per listing per month. |
-| `mart/` | `dm_listing_neighbourhood`, `dm_property_type`, `dm_host_neighbourhood` | Monthly KPIs: active rate, prices, Superhost rate, stays, revenue, month-on-month change |
+| `mart/` | `mart_listing_neighbourhood`, `mart_property_type`, `mart_host_neighbourhood` | Monthly KPIs: active rate, prices, Superhost rate, stays, revenue, month-on-month change |
 | `adhoc/` | `adhoc_lga_demographics`, `adhoc_median_age_vs_revenue`, `adhoc_best_listing_type`, `adhoc_host_lga_spread`, `adhoc_mortgage_coverage` | One view per business question, feeding the dashboards |
 
 **How facts join to history:**
