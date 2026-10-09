@@ -111,7 +111,9 @@ From the 12 months of data:
 
 **Prerequisites:** Docker, Python 3.12+ with [uv](https://docs.astral.sh/uv/), an S3 bucket, a Postgres database (RDS or local), and AWS credentials in `~/.aws`.
 
-1. **Configure the environment.** Create `.env` in the project root:
+1. **Get the data.** Download the Sydney listings for May 2020–April 2021 from the Inside Airbnb archive and save the CSVs in `data/listings/`, named `05_2020.csv` through `04_2021.csv`. Download the ABS 2016 Census General Community Profile G01 and G02 CSVs for NSW LGAs and save them in `data/census/` as `2016Census_G01_NSW_LGA.csv` and `2016Census_G02_NSW_LGA.csv`.
+
+2. **Configure the environment.** Create `.env` in the project root:
    ```bash
    S3_BUCKET=your-bucket
    POSTGRES_HOST=your-host
@@ -121,14 +123,14 @@ From the 12 months of data:
    ```
    Then copy `airflow/.env.example` to `airflow/.env` and fill in the Airflow keys.
 
-2. **Upload the source files and create the Bronze tables.**
+3. **Upload the source files and create the Bronze tables.**
    ```bash
    uv sync
    aws s3 cp data/ s3://your-bucket/ --recursive
    uv run python -m ingestion.create_tables   # one-time setup: drops and recreates the bronze schema
    ```
 
-3. **Start Airflow and Metabase.**
+4. **Start Airflow and Metabase.**
    ```bash
    cd airflow
    docker compose build
@@ -136,9 +138,9 @@ From the 12 months of data:
    ```
    Airflow is at http://localhost:8080 and Metabase at http://localhost:3000.
 
-4. **Run the pipeline.** Unpause `airbnb_etl` in the Airflow UI. It backfills all 12 months in order, about 1–2 minutes per month.
+5. **Run the pipeline.** Unpause `airbnb_etl` in the Airflow UI. It backfills all 12 months in order, about 1–2 minutes per month.
 
-5. **Rebuild the dashboard** after a dbt run:
+6. **Rebuild the dashboard** after a dbt run:
    ```bash
    uv run python -m dashboard.build
    ```
