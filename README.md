@@ -17,24 +17,9 @@ An end-to-end ELT pipeline that turns 12 months of [Inside Airbnb](https://insid
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Sources
-        A[Inside Airbnb<br/>12 monthly CSVs]
-        B[ABS Census 2016<br/>G01, G02]
-        C[NSW LGA codes &<br/>suburb mapping]
-    end
-    A & B & C --> S3[(AWS S3<br/>raw bucket)]
-    S3 -->|Python + COPY| BR[Bronze<br/>raw text tables]
-    subgraph Postgres on AWS RDS
-        BR --> SV[Silver<br/>staging · intermediate · SCD2 snapshots]
-        SV --> GD[Gold<br/>star schema · marts · ad-hoc views]
-    end
-    GD --> MB[Metabase<br/>self-serve BI]
-    GD --> DB[Insights dashboard<br/>HTML + SVG]
-    AF{{Airflow 3 + Cosmos<br/>monthly catchup}} -.orchestrates.-> BR
-    AF -.runs dbt.-> SV
-```
+![Architecture: sources land in S3, load into Bronze, and dbt builds Silver and Gold on Postgres, orchestrated monthly by Airflow](docs/architecture.svg)
+
+<sub>Source: [`docs/architecture.excalidraw`](docs/architecture.excalidraw). Open it at excalidraw.com to edit.</sub>
 
 | Layer | Tool | What it does |
 |---|---|---|
@@ -119,7 +104,7 @@ From the 12 months of data:
 │   └── models/gold/             # star, mart, adhoc
 ├── dashboard/                   # insights dashboard: template, build script, LGA boundaries
 ├── data/                        # source CSVs
-└── docs/                        # dashboard GIF and screenshot
+└── docs/                        # dashboard GIF, screenshot, architecture diagram
 ```
 
 ## Running it
