@@ -23,6 +23,9 @@ wheels/
 # Generated Airflow logs
 /airflow/logs/
 
+# Local source data
+/data/
+
 # macOS metadata
 .DS_Store
 .playwright-mcp/
