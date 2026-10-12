@@ -108,6 +108,7 @@ From the 12 months of data:
 ├── terraform/
 │   ├── bootstrap/               # S3 bucket for Terraform state (applied once, never destroyed)
 │   └── *.tf                     # S3 data bucket, RDS Postgres, security group
+├── Makefile                     # shortcuts: aws-up/down, db-reset, backfill, ...
 ├── dashboard/                   # insights dashboard: template, build script, LGA boundaries
 ├── data/                        # source CSVs (gitignored)
 ├── sample_data/                 # small sample of every source file, for a quick try
@@ -116,52 +117,36 @@ From the 12 months of data:
 
 ## Running it
 
-**Prerequisites:** Docker, Python 3.12+ with [uv](https://docs.astral.sh/uv/), [Terraform](https://developer.hashicorp.com/terraform/install) 1.15+, and AWS credentials in `~/.aws`.
+**Prerequisites:** Docker, Python 3.12+ with [uv](https://docs.astral.sh/uv/), [Terraform](https://developer.hashicorp.com/terraform/install) 1.15+, `psql`, and AWS credentials in `~/.aws`.
+
+Everyday commands are wrapped in a `Makefile`. Run `make` to list them.
 
 1. **Get the data.** Download the Sydney listings for May 2020–April 2021 from the Inside Airbnb archive and save the CSVs in `data/listings/`, named `05_2020.csv` through `04_2021.csv`. Download the ABS 2016 Census General Community Profile G01 and G02 CSVs for NSW LGAs and save them in `data/census/` as `2016Census_G01_NSW_LGA.csv` and `2016Census_G02_NSW_LGA.csv`. To try it quickly, copy `sample_data/` to `data/` instead.
 
-2. **Create the infrastructure.** Bucket names are global, so first change the bucket names in `terraform/bootstrap/main.tf`, `terraform/versions.tf` and `terraform/main.tf` to your own.
-   ```bash
-   cd terraform/bootstrap
-   terraform init && terraform apply          # once: the Terraform state bucket
-
-   cd ..
-   cp terraform.tfvars.example terraform.tfvars   # set my_ip to your public IP
-   terraform init && terraform apply          # S3 data bucket, RDS Postgres, security group
-   ```
-   RDS takes about 10 minutes. `terraform destroy` in `terraform/` removes everything that costs money; the state bucket stays.
-
-3. **Configure the environment.** Create `.env` in the project root, using the values from `terraform output`:
-   ```bash
-   S3_BUCKET=<s3_bucket>
-   POSTGRES_HOST=<postgres_host>
-   POSTGRES_DATABASE=airbnb
-   POSTGRES_USER=tung
-   POSTGRES_PASSWORD=<terraform output -raw postgres_password>
-   ```
-   Then copy `airflow/.env.example` to `airflow/.env` and fill in the Airflow keys.
-
-4. **Upload the source files and create the Bronze tables.**
+2. **One-time setup.** Bucket names are global, so first change the bucket names in `terraform/bootstrap/main.tf`, `terraform/versions.tf` and `terraform/main.tf` to your own.
    ```bash
    uv sync
-   aws s3 sync data/ s3://$(terraform -chdir=terraform output -raw s3_bucket)/
-   uv run python -m ingestion.create_tables   # one-time setup: drops and recreates the bronze schema
+   (cd terraform/bootstrap && terraform init && terraform apply)   # Terraform state bucket, never destroyed
+   terraform -chdir=terraform init
+   cp terraform/terraform.tfvars.example terraform/terraform.tfvars
    ```
+   Create `.env` in the project root with `POSTGRES_DATABASE=airbnb` and `POSTGRES_USER=tung`; `make aws-up` fills in the bucket, host and password. Then copy `airflow/.env.example` to `airflow/.env` and fill in the Airflow keys.
 
-5. **Start Airflow and Metabase.**
+3. **Start the infrastructure.**
    ```bash
-   cd airflow
-   docker compose build
-   docker compose up -d
+   make aws-ip    # allow your current public IP to reach Postgres
+   make aws-up    # S3 bucket + RDS, writes .env, uploads data/, creates Bronze (~12 min)
    ```
-   Airflow is at http://localhost:8080 and Metabase at http://localhost:3000.
 
-6. **Run the pipeline.** Unpause `airbnb_etl` in the Airflow UI. It backfills all 12 months in order, about 1–2 minutes per month.
+4. **Start Airflow and Metabase.** `make airflow-up`. Airflow is at http://localhost:8080 and Metabase at http://localhost:3000.
 
-7. **Rebuild the dashboard** after a dbt run:
-   ```bash
-   uv run python -m dashboard.build
-   ```
+5. **Run the pipeline.** Unpause `airbnb_etl` in the Airflow UI. It backfills all 12 months in order, about 1–2 minutes per month.
+
+6. **Rebuild the dashboard** after a dbt run: `make dashboard`.
+
+7. **Shut down when finished.** `make airflow-down`, then `make aws-down`. This destroys the S3 bucket and RDS, so nothing is billed while idle; `make aws-up` rebuilds everything and the backfill replays the history. `make aws-running` lists anything still running in the account.
+
+**After a bug:** `make db-drop SCHEMA=gold` and re-run the dbt tasks when only Gold is wrong. When snapshot history is wrong, `make db-reset` and `make backfill` replay every month from May 2020.
 
 ## Design decisions
 
