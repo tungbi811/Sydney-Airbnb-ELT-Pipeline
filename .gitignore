@@ -34,3 +34,4 @@ wheels/
 .terraform/
 *.tfstate
 *.tfstate.*
+terraform.tfvars
