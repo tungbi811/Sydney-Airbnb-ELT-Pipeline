@@ -29,3 +29,8 @@ wheels/
 # macOS metadata
 .DS_Store
 .playwright-mcp/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*

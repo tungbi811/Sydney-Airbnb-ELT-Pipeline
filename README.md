@@ -126,7 +126,7 @@ From the 12 months of data:
 3. **Upload the source files and create the Bronze tables.**
    ```bash
    uv sync
-   aws s3 cp data/ s3://your-bucket/ --recursive
+   aws s3 sync data/ s3://airbnb-sydney-raw-data/
    uv run python -m ingestion.create_tables   # one-time setup: drops and recreates the bronze schema
    ```
 
