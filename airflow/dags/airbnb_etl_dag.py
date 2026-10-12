@@ -8,7 +8,9 @@ from cosmos import DbtTaskGroup, ProjectConfig, ProfileConfig, ExecutionConfig
     start_date=datetime(2020, 5, 1),
     end_date=datetime(2021,4,1),
     catchup=True,
-    max_active_runs=1
+    max_active_runs=1,
+    max_consecutive_failed_dag_runs=1,
+    default_args={"retries": 2, "retry_delay": timedelta(seconds=30)}
 )
 def airbnb_etl():
 
