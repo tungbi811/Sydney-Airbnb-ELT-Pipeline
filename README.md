@@ -13,6 +13,7 @@ An end-to-end ELT pipeline that turns 12 months of [Inside Airbnb](https://insid
 - **Airflow backfill, one month per run:** `catchup=True` with `max_active_runs=1` replays the 12 months in order, which is what lets the snapshots build real history. Loading everything at once would have captured only the final state.
 - **dbt inside Airflow through Astronomer Cosmos:** every dbt model, snapshot and test is its own Airflow task, with retries and lineage.
 - **Idempotent loads:** each listings file is loaded once (tracked by `source_file`), and reference tables are reloaded with `TRUNCATE` plus `COPY` in a single transaction. Any run can be retried safely.
+- **Infrastructure as code with Terraform:** the S3 bucket, RDS Postgres and its security group are created and torn down with one command. State lives in a versioned S3 bucket with native locking, so the stack can be destroyed when idle and rebuilt on demand.
 - **Verified end to end:** row counts reconcile at every layer (CSV = Bronze = Staging = Fact, 412,122 rows), every fact row matches exactly one dimension version, and all dbt tests pass.
 
 ## Architecture
@@ -23,8 +24,9 @@ An end-to-end ELT pipeline that turns 12 months of [Inside Airbnb](https://insid
 
 | Layer | Tool | What it does |
 |---|---|---|
+| Infrastructure | Terraform | S3 bucket, RDS Postgres, security group; remote state in S3 |
 | Storage | AWS S3 | Raw CSVs, partitioned by source (`listings/`, `census/`, `suburb/`) |
-| Warehouse | Postgres 16 on AWS RDS | `bronze`, `silver` and `gold` schemas |
+| Warehouse | Postgres 18 on AWS RDS | `bronze`, `silver` and `gold` schemas |
 | Ingestion | Python, boto3, psycopg2 | Streams files from S3 into Bronze with `COPY` |
 | Transformation | dbt-core 1.12, dbt-postgres | Staging, intermediate models, snapshots, star schema, marts, tests |
 | Orchestration | Apache Airflow 3.3 in Docker, Astronomer Cosmos | One run per month: load Bronze, then the whole dbt graph |
@@ -69,6 +71,7 @@ load_listings ──┘
 ```
 
 - `load_listings` loads only the run's own file, `listings/{MM_YYYY}.csv`, taken from the run's logical date.
+- Failed tasks retry twice. A run that still fails pauses the DAG (`max_consecutive_failed_dag_runs=1`), so later months can't load out of order and corrupt the snapshot history.
 - dbt runs in its own virtualenv inside a custom Airflow image, so its dependencies never conflict with Airflow's.
 - The stack runs on the LocalExecutor (Postgres metadata DB, API server, scheduler, DAG processor), which suits a single machine. AWS credentials are mounted read-only from `~/.aws`.
 
@@ -102,35 +105,50 @@ From the 12 months of data:
 │   ├── models/silver/           # staging + intermediate
 │   ├── snapshots/               # SCD2 snapshots
 │   └── models/gold/             # star, mart, adhoc
+├── terraform/
+│   ├── bootstrap/               # S3 bucket for Terraform state (applied once, never destroyed)
+│   └── *.tf                     # S3 data bucket, RDS Postgres, security group
 ├── dashboard/                   # insights dashboard: template, build script, LGA boundaries
-├── data/                        # source CSVs
+├── data/                        # source CSVs (gitignored)
+├── sample_data/                 # small sample of every source file, for a quick try
 └── docs/                        # dashboard GIF, screenshot, architecture diagram
 ```
 
 ## Running it
 
-**Prerequisites:** Docker, Python 3.12+ with [uv](https://docs.astral.sh/uv/), an S3 bucket, a Postgres database (RDS or local), and AWS credentials in `~/.aws`.
+**Prerequisites:** Docker, Python 3.12+ with [uv](https://docs.astral.sh/uv/), [Terraform](https://developer.hashicorp.com/terraform/install) 1.15+, and AWS credentials in `~/.aws`.
 
-1. **Get the data.** Download the Sydney listings for May 2020–April 2021 from the Inside Airbnb archive and save the CSVs in `data/listings/`, named `05_2020.csv` through `04_2021.csv`. Download the ABS 2016 Census General Community Profile G01 and G02 CSVs for NSW LGAs and save them in `data/census/` as `2016Census_G01_NSW_LGA.csv` and `2016Census_G02_NSW_LGA.csv`.
+1. **Get the data.** Download the Sydney listings for May 2020–April 2021 from the Inside Airbnb archive and save the CSVs in `data/listings/`, named `05_2020.csv` through `04_2021.csv`. Download the ABS 2016 Census General Community Profile G01 and G02 CSVs for NSW LGAs and save them in `data/census/` as `2016Census_G01_NSW_LGA.csv` and `2016Census_G02_NSW_LGA.csv`. To try it quickly, copy `sample_data/` to `data/` instead.
 
-2. **Configure the environment.** Create `.env` in the project root:
+2. **Create the infrastructure.** Bucket names are global, so first change the bucket names in `terraform/bootstrap/main.tf`, `terraform/versions.tf` and `terraform/main.tf` to your own.
    ```bash
-   S3_BUCKET=your-bucket
-   POSTGRES_HOST=your-host
+   cd terraform/bootstrap
+   terraform init && terraform apply          # once: the Terraform state bucket
+
+   cd ..
+   cp terraform.tfvars.example terraform.tfvars   # set my_ip to your public IP
+   terraform init && terraform apply          # S3 data bucket, RDS Postgres, security group
+   ```
+   RDS takes about 10 minutes. `terraform destroy` in `terraform/` removes everything that costs money; the state bucket stays.
+
+3. **Configure the environment.** Create `.env` in the project root, using the values from `terraform output`:
+   ```bash
+   S3_BUCKET=<s3_bucket>
+   POSTGRES_HOST=<postgres_host>
    POSTGRES_DATABASE=airbnb
-   POSTGRES_USER=your-user
-   POSTGRES_PASSWORD=your-password
+   POSTGRES_USER=tung
+   POSTGRES_PASSWORD=<terraform output -raw postgres_password>
    ```
    Then copy `airflow/.env.example` to `airflow/.env` and fill in the Airflow keys.
 
-3. **Upload the source files and create the Bronze tables.**
+4. **Upload the source files and create the Bronze tables.**
    ```bash
    uv sync
-   aws s3 sync data/ s3://airbnb-sydney-raw-data/
+   aws s3 sync data/ s3://$(terraform -chdir=terraform output -raw s3_bucket)/
    uv run python -m ingestion.create_tables   # one-time setup: drops and recreates the bronze schema
    ```
 
-4. **Start Airflow and Metabase.**
+5. **Start Airflow and Metabase.**
    ```bash
    cd airflow
    docker compose build
@@ -138,9 +156,9 @@ From the 12 months of data:
    ```
    Airflow is at http://localhost:8080 and Metabase at http://localhost:3000.
 
-5. **Run the pipeline.** Unpause `airbnb_etl` in the Airflow UI. It backfills all 12 months in order, about 1–2 minutes per month.
+6. **Run the pipeline.** Unpause `airbnb_etl` in the Airflow UI. It backfills all 12 months in order, about 1–2 minutes per month.
 
-6. **Rebuild the dashboard** after a dbt run:
+7. **Rebuild the dashboard** after a dbt run:
    ```bash
    uv run python -m dashboard.build
    ```
